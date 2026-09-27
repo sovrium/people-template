@@ -1,26 +1,29 @@
-# people
+# meridian-people
 
-HR workspace — an employee directory with field-level salary protection, a time-off calendar, and a request flow where an approval automation pauses until an admin signs off.
+Meridian People — a small company's HR workspace. The directory lists the team and withholds each
+salary from everyone but an admin, on the server; time off shows who is away by name and what waits
+on a decision; a request is filed by the person it concerns and waits on an admin, who decides in the
+app; and the HR overview counts the team and its time off.
 
 ## This app at a glance
 
 - **Tables** (2): employees, time_off_requests
-- **Pages** (4): sign-in, directory, time-off, requests
+- **Pages** (5): directory (`/`), time-off, requests (admin), overview (admin), sign-in
 - **Automations** (1): approve-time-off
 - **Singletons**: auth, design
+- **Seed data**: `seed/` — twelve sign-in accounts, twelve people with their managers, and eleven
+  time-off requests, dated relative to the day you seed
 - **Static assets**: `public/` (served at the site root)
 
 Config is pre-split: `app.yaml` is the entry point and `$ref`s the files under `config/`.
 
-## Your Claude Code setup
+## Working on this app with an AI assistant
 
-This project ships one agent: `.claude/agents/app-editor.md`. It knows the Sovrium
-config conventions and is the right agent for extending this app — adding tables and
-fields, pages and views, automations, forms, and permissions.
-
-It is a **starting point, not a fixed set**. Add your own agents under `.claude/agents/`
-as your app grows (a data-modeling agent, a content agent, a deployment agent — whatever
-your workflow needs).
+Run `sovrium skills` in this directory to write the Agent Skills for the Sovrium version you
+run into `.claude/skills/`; start from `sovrium-app` for any change to the config. The
+design system is in `config/design.yaml`: read its comments before changing a colour, keep
+one accent, and keep colour for the three decisions (approved, pending, rejected). A field a
+member may not read belongs in the table's `permissions.fields`, never only in a page.
 
 ---
 
@@ -29,6 +32,51 @@ platform. The entire app (data model, auth, pages, design, i18n) is declared in 
 YAML config files (a single `app.yaml` to start, split via `$ref` as the app grows) and
 served by the `sovrium` runtime. There is no hand-written
 server or UI code to maintain.
+
+## Documentation
+
+The Sovrium manual ships inside the binary. Where you read it depends on whether you can
+run commands.
+
+**With a shell** (Claude Code, Cursor, Codex, a terminal), `sovrium docs` is the manual for
+the version you run, so it can never describe a different one. Start there:
+
+```bash
+sovrium docs                   # The table of contents
+sovrium docs search <words>    # Find the article covering a topic
+sovrium docs <section>/<slug>  # Read it
+sovrium docs config <path>     # Look one option up (e.g. tables[].fields[].type)
+sovrium docs env <NAME>        # Look one environment variable up
+sovrium docs cli <verb>        # Look one command up
+sovrium schema                 # The full JSON Schema of this binary
+```
+
+**Agent skills.** `.claude/skills/` holds the skills written by `sovrium skills` for the
+version in this project: start from `sovrium-app` for any change to the config. After
+upgrading Sovrium, run `sovrium skills` again to refresh them — a file you edited is kept
+unless you pass `--force`. For Codex, Copilot, Gemini CLI or OpenCode, run
+`sovrium skills --target agents` to write them to `.agents/skills/` as well.
+
+**If your client cannot run commands** (for example Claude Desktop connected through
+`sovrium mcp`, whose tools edit the config but serve no documentation), read the published
+copy instead:
+
+- **Start at the index:** `https://sovrium.com/llms.txt` — a plain-text list of every published
+  page, one titled line each with a short description. Pick a page from there instead of
+  guessing a slug.
+- **Fetch that page with `.md` appended.** Every docs page has a raw-markdown twin:
+  `https://sovrium.com/en/docs/configuration-refs.md` is about 3.8 KB against 121 KB for the
+  same page as HTML. Always take the `.md`.
+- **Never fetch `https://sovrium.com/llms-full.txt`** — the entire corpus in one file, roughly
+  3 MB; a single call floods the context window. Use the index, one page at a time.
+- The index carries English and French — prefer `/en/…`, switch to `/fr/…` for a French user.
+
+That copy describes the latest release, which may not be the one in this project. Compare
+with `sovrium --version`, or with the version the MCP server reports when it connects.
+
+Where sources disagree, the binary wins: `sovrium docs` and `sovrium schema` describe the one
+you are actually running, the website describes the latest release, and pretrained knowledge
+of Sovrium may describe an older one.
 
 ## How to work in this project (read first)
 
@@ -50,25 +98,60 @@ sovrium start app.yaml --watch # Hot-reload on config changes
 sovrium validate app.yaml      # Validate the config against the schema
 sovrium schema                 # Print the full JSON Schema for app.yaml
 sovrium build app.yaml         # Build static output
+sovrium mcp --project .        # Serve this config to your AI client (MCP, stdio)
 ```
+
+## Connecting your AI client
+
+`sovrium mcp --project .` serves this project's configuration to Claude Desktop, Claude Code
+or Cursor over stdio. Point your client at it — command `sovrium`, arguments
+`mcp --project <this directory>` — and the assistant editing `app.yaml` can read the config
+as it stands, validate what it just wrote, consult the schema at a given path, and see
+whether a running instance took the last save, instead of guessing from a file it has not
+seen. It starts no server: there is no token to configure and no `auth:` block to add.
+
+Those four tools are read-only unless you set `MCP_CONFIG_WRITE=1`. It is off by default, and
+it is an environment variable rather than a config key on purpose — a config file must not be
+able to authorise its own editing. Set it, name this directory explicitly, and four more
+tools appear: the assistant can list the files your config is made of, read one, replace one,
+and undo its last change.
+
+```json
+{
+  "mcpServers": {
+    "sovrium": {
+      "command": "sovrium",
+      "args": ["mcp", "--project", "/absolute/path/to/this/project"],
+      "env": { "MCP_CONFIG_WRITE": "1" }
+    }
+  }
+}
+```
+
+Writing is bounded rather than trusted. Edits stay inside this directory and touch only
+`.yaml`, `.yml` and `.json` files — never `.env`, `.git/`, `.claude/` or the data directory.
+A file that changed on disk since the assistant read it is refused rather than overwritten,
+and a change that would not decode as a valid config never reaches the disk. Dropping a
+column needs `allowDestructive: true`, which the assistant is never allowed to set for you.
+Every change is snapshotted first, so `undo` always has a way back.
 
 ## Reviewing changes in the browser
 
 Validating is not verifying. After a config change, boot the app and drive it:
 
-- `sovrium start app.yaml --watch` serves the app at `http://localhost:3000` (override with `PORT`)
-  and hot-reloads on every save.
-- Drive that running instance with Claude in Chrome — the `mcp__claude-in-chrome__*` tools. They are
-  deferred: load them in one batched `ToolSearch`, call `tabs_context_mcp` first, open a **new** tab
-  with `tabs_create_mcp`, and close what you opened.
-- **Exercise the workflow, not just the page.** Sign in, create a record, submit the form, let the
-  automation fire — then check the **effect** (the row is there, the status changed), never just
-  that something rendered.
-- Because `--watch` hot-reloads, the loop is: edit the config, re-navigate, re-verify. Repeat until
-  the workflow passes.
-- Never trigger `alert()` / `confirm()` / `prompt()` — a JS dialog freezes the extension. If Chrome
-  is not connected, or calls keep failing, say so and stop rather than reporting a change as
-  verified when nothing was driven.
+- `sovrium start app.yaml --watch` serves the app at `http://localhost:3000` (override with
+  `PORT`) and hot-reloads on every save.
+- Drive that running instance with Claude in Chrome — the `mcp__claude-in-chrome__*` tools.
+  They are deferred: load them in one batched `ToolSearch`, call `tabs_context_mcp` first, open
+  a **new** tab with `tabs_create_mcp`, and close what you opened.
+- **Exercise the workflow, not just the page.** Sign in, create a record, submit the form, let
+  the automation fire — then check the **effect** (the row is there, the status changed), never
+  just that something rendered.
+- Because `--watch` hot-reloads, the loop is: edit the config, re-navigate, re-verify. Repeat
+  until the workflow passes.
+- Never trigger `alert()` / `confirm()` / `prompt()` — a JS dialog freezes the extension. If
+  Chrome is not connected, or calls keep failing, say so and stop rather than reporting a
+  change as verified when nothing was driven.
 
 ## Scaling the config
 
@@ -123,22 +206,24 @@ but that's a secondary split, not the primary one.
 Note: reusable **component templates** are root entities (their own files);
 page-instance components stay inside the page file.
 
-Prefer YAML for readability. For IDE autocompletion and compile-time
-type-checking, author a `.ts` config instead: run `sovrium types` in this
-directory to write `sovrium.d.ts` and `tsconfig.json`, then
+Prefer YAML for readability; switch to a `.ts` config if you want IDE
+autocompletion and compile-time type-checking. Run `sovrium types` to write
+`sovrium.d.ts` and a `tsconfig.json` beside your config — no `package.json`,
+no `node_modules`, no install step — then author `app.ts` like this:
 
 ```ts
-// app.ts
 import type { AppConfig } from 'sovrium'
 
-export default { name: 'my-app' } satisfies AppConfig
+export default {
+  name: 'my-app',
+} satisfies AppConfig
 ```
 
-The types come out of the binary itself — no `package.json`, no `node_modules`,
-no install step — so they always describe the schema the binary you run actually
-accepts. Re-run `sovrium types` after upgrading it. Keep the import type-only:
-the binary does not resolve bare-package specifiers, so a value import
-type-checks and then fails to boot.
+The import MUST be `import type`, and the object MUST be checked with
+`satisfies` rather than constructed by a helper function. The runtime does not
+resolve bare-package specifiers, so a value import (the old `defineConfig()`
+shape) type-checks and then fails to boot; `import type` is erased before the
+runtime ever looks. Re-run `sovrium types` after upgrading the binary.
 
 ## The `app.yaml` schema
 
@@ -148,6 +233,10 @@ Root properties include: `name`, `description`, `tables`, `auth`, `pages`, `desi
 - **`tables`** — your data model. Each table has `fields`; field `type` spans many
   categories (text, number, date/time, select, relation, attachment, rich-text, code,
   formula, AI-compute, …). The runtime generates the database, REST API, and CRUD UI.
+- **Field `id`s** — set one on every field. An omitted id means "position in the list", so
+  inserting a field above another one shifts every id after it, and the migration diff reads
+  that shift as a rename of fields nobody renamed. Keep the ids a field already has; give a
+  new field the next unused number.
 - **`auth`** — authentication (email/password, magic link, OAuth) plus role-based access
   (`admin`, `member`, `viewer`) and field-level permissions.
 - **`pages`** — composed from many built-in component types (forms, tables, kanban,
@@ -162,21 +251,3 @@ the zero-config SQLite database (`database.db`), the server lock file, and local
 storage. Set `DATABASE_URL` to use PostgreSQL instead. Relocate the whole folder with
 the `SOVRIUM_DATA_DIR` env var. Operator settings live in **environment variables**, not
 in `app.yaml`.
-
-## Documentation
-
-`sovrium schema` is the local contract — it prints the JSON Schema of the binary sitting in this
-project. When the published docs and `sovrium schema` disagree, the schema wins: the website
-describes some released version, the schema describes the one you are actually running.
-
-- **Start at the index:** `https://sovrium.com/llms.txt` — a plain-text list of every published
-  page, one titled line each with a short description. Pick a page from there instead of guessing
-  a slug.
-- **Fetch that page with `.md` appended.** Every docs page has a raw-markdown twin:
-  `https://sovrium.com/en/docs/configuration-refs.md` is about 3.8 KB against 121 KB for the same
-  page as HTML. Always take the `.md`.
-- **Never fetch `https://sovrium.com/llms-full.txt`** — the entire corpus in one file, roughly 3 MB;
-  a single call floods the context window. Use the index and pull one page at a time.
-- The index carries English and French — prefer `/en/…`, switch to `/fr/…` when working in French.
-- Docs home: https://sovrium.com/docs
-- Local schema reference: `sovrium schema`
