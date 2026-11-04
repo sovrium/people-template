@@ -1,6 +1,6 @@
 # Meridian People
 
-> A small company's HR workspace: the team, who is away, and who decides.
+> A small company's HR workspace: the team, who is away, who decides, and contracts signed online.
 
 Built with [Sovrium](https://sovrium.com) — a configuration-as-code interpreter: one config
 file in, a complete self-hosted web application out.
@@ -30,6 +30,13 @@ sovrium init my-people --template people
   and marks the request Approved.
 - **HR overview** (admins) — headcount, the requests waiting on a decision, and headcount by
   team and approved days by type.
+- **Contracts** (admins) — draft an employment contract with its PDF, then **Send for
+  signature**. The employee gets a link by email and signs; the manager's link follows. Once
+  both have signed, the contract holds the signed PDF and a proof file listing each signer,
+  the document fingerprint and every step. This is a simple electronic signature with an
+  evidence file; `sovrium signature verify` checks an exported request. To also ask each
+  signer for a code mailed to their address, set `SIGNATURE_OTP_SECRET` and add
+  `verify: { email: true }` to `config/signatures/employment-contract.yaml`.
 
 - **A new account finds its row** — add the person to the directory, then create their
   account: an automation on the account's creation writes it on the row with the same email,
@@ -65,6 +72,10 @@ Then:
 4. Open Tomás in the **Directory** as Noor: his salary is there. Open the same card as Tomás:
    it is not, because the server never sent it.
 5. As Tomás, try to open **Requests** or the **HR overview**: you are sent away.
+6. Set the SMTP variables, restart, and as Noor open **Contracts**: send Dmitri's drafted
+   contract for signature. Open the link mailed to dmitri.sokolov@meridian.example and sign;
+   then the one mailed to Hannah.
+   The contract turns completed, with its signed PDF and proof file.
 
 ## Run locally
 

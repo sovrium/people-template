@@ -3,19 +3,25 @@
 Meridian People — a small company's HR workspace. The directory lists the team and withholds each
 salary from everyone but an admin, on the server; time off shows who is away by name and what waits
 on a decision; a request is filed by the person it concerns and waits on an admin, who decides in the
-app; and the HR overview counts the team and its time off.
+app; the HR overview counts the team and its time off; and an employment contract goes out for
+signature, to the employee then the manager, and comes back signed with its evidence file.
 
 ## This app at a glance
 
-- **Tables** (2): employees, time_off_requests
-- **Pages** (5): directory (`/`), time-off, requests (admin), overview (admin), sign-in
-- **Automations** (3): approve-time-off; join-new-account-to-directory (an auth trigger on
-  `signUp`, with an `auth` assignRole step for the People team); and record-to-google-doc — a
-  library recipe (`library/recipe/`, with its `library/connection/google.yaml`) copying a
-  welcome document for each new hire once the Google variables are set
-- **Singletons**: auth, design, env
-- **Seed data**: `seed/` — twelve sign-in accounts, twelve people with their managers, and eleven
-  time-off requests, dated relative to the day you seed
+- **Tables** (3): employees, time_off_requests, contracts
+- **Pages** (7): directory (`/`), time-off, requests (admin), overview (admin), contracts
+  (admin), sign-in, and contract-signing (`/sign/:token`, opened from a signer's email)
+- **Automations** (4): approve-time-off; join-new-account-to-directory (an auth trigger on
+  `signUp`, with an `auth` assignRole step for the People team); send-contract-for-signature (a
+  `signature/send` step); and record-to-google-doc — a library recipe (`library/recipe/`, with
+  its `library/connection/google.yaml`) copying a welcome document for each new hire once the
+  Google variables are set
+- **Signing flows** (1): employment_contract (`config/signatures/`), the employee then the
+  manager, each from a link sent to their email
+- **Singletons**: auth, design, env, buckets (contracts)
+- **Seed data**: `seed/` — twelve sign-in accounts, twelve people with their managers, eleven
+  time-off requests dated relative to the day you seed, and one drafted contract with a sample
+  PDF in `seed/assets/`
 - **Static assets**: `public/` (served at the site root)
 
 Config is pre-split: `app.yaml` is the entry point and `$ref`s the files under `config/`.
@@ -26,7 +32,9 @@ Run `sovrium skills` in this directory to write the Agent Skills for the Sovrium
 run into `.claude/skills/`; start from `sovrium-app` for any change to the config. The
 design system is in `config/design.yaml`: read its comments before changing a colour, keep
 one accent, and keep colour for the three decisions (approved, pending, rejected). A field a
-member may not read belongs in the table's `permissions.fields`, never only in a page.
+member may not read belongs in the table's `permissions.fields`, never only in a page. The
+signature fields, the signed file, the proof file and `signing_status` of a contract are
+written by the engine alone: never bind a form or an update step to them.
 
 ---
 
